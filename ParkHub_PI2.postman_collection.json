@@ -1,0 +1,113 @@
+{
+  "info": {
+    "name": "ParkHub PI2 - Extender reservación",
+    "description": "Correr en orden: 1 y 2 preparan los datos; 3 es la extensión exitosa; 4, 5 y 6 son errores. Requiere el servidor en http://localhost:3000 con npm run seed.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:3000" },
+    { "key": "spotId", "value": "" },
+    { "key": "reservationId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Listar espacios (guarda spotId)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const spots = pm.response.json();",
+              "pm.collectionVariables.set('spotId', spots[0].id);"
+            ]
+          }
+        }
+      ],
+      "request": { "method": "GET", "url": "{{baseUrl}}/api/spots" }
+    },
+    {
+      "name": "2. Crear reservación de 1 h (guarda reservationId)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const start = new Date(Date.now() + 60 * 1000);",
+              "const end = new Date(Date.now() + 60 * 60 * 1000);",
+              "pm.variables.set('startTime', start.toISOString());",
+              "pm.variables.set('endTime', end.toISOString());"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.collectionVariables.set('reservationId', pm.response.json()._id);"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/reservations",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"parkingSpotId\": \"{{spotId}}\",\n  \"startTime\": \"{{startTime}}\",\n  \"endTime\": \"{{endTime}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "3. Extender 1 h más (200)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const newEnd = new Date(Date.now() + 2 * 60 * 60 * 1000);",
+              "pm.variables.set('newEndTime', newEnd.toISOString());"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/reservations/{{reservationId}}/extend",
+        "body": { "mode": "raw", "raw": "{\n  \"endTime\": \"{{newEndTime}}\"\n}" }
+      }
+    },
+    {
+      "name": "4. Error: reservación no existe (404)",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/reservations/64b000000000000000000000/extend",
+        "body": { "mode": "raw", "raw": "{\n  \"endTime\": \"2030-01-01T10:00:00.000Z\"\n}" }
+      }
+    },
+    {
+      "name": "5. Error: nueva hora no posterior (400)",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/reservations/{{reservationId}}/extend",
+        "body": { "mode": "raw", "raw": "{\n  \"endTime\": \"2020-01-01T10:00:00.000Z\"\n}" }
+      }
+    },
+    {
+      "name": "6. Error: id inválido (400)",
+      "request": {
+        "method": "PATCH",
+        "header": [{ "key": "Content-Type", "value": "application/json" }],
+        "url": "{{baseUrl}}/api/reservations/abc123/extend",
+        "body": { "mode": "raw", "raw": "{\n  \"endTime\": \"2030-01-01T10:00:00.000Z\"\n}" }
+      }
+    }
+  ]
+}

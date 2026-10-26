@@ -31,8 +31,23 @@ export function validateExtensionEndTime(
   newEndTime: unknown,
   now: Date
 ): Date | null {
-  // TODO PRACTICE 2:
-  // Determine whether the requested end time is a valid extension of the
-  // current reservation. Return the parsed date only when it is valid.
-  return null;
+  // La nueva hora debe llegar como texto ISO, igual que en createReservation.
+  if (typeof newEndTime !== 'string') {
+    return null;
+  }
+
+  const newEnd = new Date(newEndTime);
+
+  // Se rechaza si la fecha es inválida, si no es posterior a la hora final
+  // actual o si ya quedó en el pasado.
+  if (Number.isNaN(newEnd.getTime()) || newEnd <= currentEnd || newEnd <= now) {
+    return null;
+  }
+
+  return newEnd;
+}
+
+export function canExtendReservation(status: string, currentEnd: Date, now: Date) {
+  // Solo se puede extender una reservación ACTIVE que todavía no termina.
+  return status === 'ACTIVE' && currentEnd > now;
 }

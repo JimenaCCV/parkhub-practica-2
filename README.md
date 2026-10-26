@@ -83,7 +83,7 @@ La API usa JSON y está disponible en el mismo puerto que la página. Las horas 
 | `GET` | `/api/reservations` | Lista las reservaciones, incluidas las canceladas, con el número del espacio asociado cuando existe. |
 | `POST` | `/api/reservations` | Crea una reservación. Devuelve `201` al crearla, `400` por datos inválidos, `404` si el espacio no existe o `409` si no puede reservarse. |
 | `PATCH` | `/api/reservations/:id/cancel` | Cancela una reservación. Devuelve la reservación actualizada o `404` si no existe. |
-| `PATCH` | `/api/reservations/:id/extend` | **Pendiente en esta práctica.** La ruta está preparada y responde `501` hasta que se implemente. |
+| `PATCH` | `/api/reservations/:id/extend` | Extiende la hora final de una reservación `ACTIVE` que no ha terminado. Devuelve `200` con la reservación actualizada, `400` por id, estado o fecha inválidos, `404` si no existe o `409` si el nuevo horario choca con otra reservación. |
 
 Para crear una reservación, primero consulta `GET /api/spots` y usa el `id` de uno de sus elementos:
 
@@ -117,16 +117,50 @@ src/
   public/                        Página, estilos y código del navegador
 ```
 
-## Práctica Integradora 2
+## Práctica Integradora 2: extender una reservación
 
-La historia de usuario se entrega por separado. Antes de programar, analízala, identifica las reglas y documenta tus casos de prueba. Después implementa la función, escribe tus propias pruebas Jest y registra los resultados de su ejecución.
+### Cómo usarlo
 
-Busca los comentarios `TODO PRACTICE 2` en las reglas, el servicio, la ruta y el código del navegador. Son puntos de trabajo, no respuestas. La suite completa de pruebas de extensión no está incluida en este starter.
+```bash
+npm install
+docker compose up -d     # o un MongoDB local
+npm run seed
+npm run dev              # http://localhost:3000
+```
 
-Puedes documentar tus casos antes de escribir código con una tabla como esta, completándola con tus propios escenarios:
+En la página, cada reservación activa tiene el botón **Extender**. También se puede probar con Postman importando `ParkHub_PI2.postman_collection.json`.
 
-| ID | Comportamiento a verificar | Datos o preparación | Resultado esperado |
-| --- | --- | --- | --- |
-| | | | |
+Petición:
 
-Al terminar, registra para cada caso el comando ejecutado, el resultado real y cualquier problema encontrado. Las pruebas existentes deben seguir pasando durante el trabajo.
+```http
+PATCH /api/reservations/:id/extend
+Content-Type: application/json
+
+{ "endTime": "2026-10-30T18:00:00.000Z" }
+```
+
+| Respuesta | Cuándo |
+| --- | --- |
+| `200` | Se extendió. Devuelve la misma reservación con el nuevo `endTime`. |
+| `400` | Id con formato inválido, reservación no `ACTIVE`, reservación ya terminada, o `endTime` faltante, inválido o no posterior al fin actual. |
+| `404` | La reservación no existe. |
+| `409` | El tramo agregado choca con otra reservación `ACTIVE` del mismo espacio, o la reservación cambió durante la petición. |
+
+### Archivos modificados
+
+| Archivo | Cambio |
+| --- | --- |
+| `src/features/reservations/reservation.rules.ts` | `validateExtensionEndTime` y `canExtendReservation` (reglas puras). |
+| `src/features/reservations/reservation.service.ts` | `extendReservation`: busca, valida, revisa conflictos y actualiza. |
+| `src/features/reservations/reservation.routes.ts` | Conecta `PATCH /:id/extend` con el servicio y traduce errores a HTTP. |
+| `src/public/js/parking.js` | Botón **Extender** y formulario que llama al endpoint. |
+| `src/features/reservations/__tests__/reservation.extend.test.ts` | Pruebas Jest de la extensión (CP-01 a CP-14 y reglas). |
+
+### Pruebas
+
+```bash
+npm test         # corre todas las pruebas (las anteriores y las de extensión)
+npm run build    # verifica que TypeScript compile sin errores
+```
+
+Las pruebas de extensión simulan el modelo `Reservation` con `jest.mock`, así que no necesitan MongoDB.
